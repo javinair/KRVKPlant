@@ -3,19 +3,20 @@
 
 #define LED_PIN 2
 
-void toggleLed();
-
-void toggleLed() {
-  digitalWrite(LED_PIN, HIGH);
-  delay(1000);
-  digitalWrite(LED_PIN, LOW);
-  delay(1000);
-}
+unsigned long toggleLedPreviousMillis = 0;
+const long toggleLedInterval = 1000;
 
 void setup() {
   pinMode(LED_PIN, OUTPUT);
 }
 
 void loop() {
-  toggleLed();
+  unsigned long currentMillis = millis();
+
+  if (currentMillis - toggleLedPreviousMillis >= toggleLedInterval) {
+    toggleLedPreviousMillis = currentMillis;
+
+    int ledState = digitalRead(LED_PIN);
+    digitalWrite(LED_PIN, !ledState);
+  }
 }
