@@ -2,14 +2,15 @@
 #include <WiFi.h>
 #include "secrets.h"
 #include "../lib/MqttClientHandler/MqttClientHandler.h"
+#include "../lib/ToggleLed.hpp"
 
 #define LED_PIN 2
-
-unsigned long toggleLedPreviousMillis = 0;
 const long toggleLedInterval = 2000;
 
 UDPLogger udpLogger(BROADCAST_IP, BROADCAST_PORT);
 MqttClientHandler mqttClientHandler(MQTT_SERVER_IP, MQTT_SERVER_PORT, MQTT_TOPIC_IN, udpLogger);
+ToggleLed toggleLed(LED_PIN, toggleLedInterval);
+
 
 void handleMqttMessage(const char* message);
 
@@ -33,13 +34,5 @@ void setup() {
 }
 
 void loop() {
-  unsigned long currentMillis = millis();
-
-  if (currentMillis - toggleLedPreviousMillis >= toggleLedInterval) {
-    toggleLedPreviousMillis = currentMillis;
-
-    int ledState = digitalRead(LED_PIN);
-    digitalWrite(LED_PIN, !ledState);
-    mqttClientHandler.publish(MQTT_TOPIC_OUT, ledState == HIGH ? "ON" : "OFF");
-  }
+  toggleLed.update();
 }
