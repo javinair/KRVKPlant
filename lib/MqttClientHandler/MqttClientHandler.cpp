@@ -46,3 +46,23 @@ void MqttClientHandler::publish(const char* topic, const char* payload, uint8_t 
     udpLogger.log(String("Mensaje publicado: ").c_str());
     udpLogger.log(payload);
     }    
+
+void MqttClientHandler::logMessage(const char* type, const char* message, const char* file, int line, const char* function) {
+    JsonDocument doc;
+
+    doc["timestamp"] = TimeHelper::getCurrentTime();  // Fecha y hora
+    doc["type"] = type;              // Tipo de mensaje (INFO, ERROR, etc.)
+    doc["message"] = message;        // Mensaje
+
+    JsonObject code = doc["code"].to<JsonObject>();
+    code["file"] = file;
+    code["line"] = line;
+    code["function"] = function;
+
+    // Serializar el objeto JSON a una cadena
+    char jsonBuffer[512];
+    serializeJson(doc, jsonBuffer);
+
+    // Publicar el mensaje JSON por MQTT
+    publish(MQTT_TOPIC_OUT, jsonBuffer, 0);
+}

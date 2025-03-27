@@ -5,3 +5,6 @@
 .vscode/ipch
 src/secrets.h
 esptoolenv
+.venv
+.vscode
+*.log
