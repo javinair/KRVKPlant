@@ -7,6 +7,19 @@
 #include <ESPmDNS.h>
 #include "TimeHelper.h"
 #include "StatusLED.hpp"
+#include "WaterLevelSensor.h"
+#include "WaterPump.h"
+
+/************** WaterPump **************/
+#define WATER_PUMP_PIN 42
+#define WATER_PUMP_MAX_RUNTIME 3000 // 3 seconds
+WaterPump waterPump(WATER_PUMP_PIN, WATER_PUMP_MAX_RUNTIME);
+
+
+/************** WaterLevelSensor **************/
+#define WATER_LEVEL_SENSOR_PIN 34
+WaterLevelSensor waterLevelSensor(WATER_LEVEL_SENSOR_PIN, 2);
+
 
 /************** Status LED **************/
 #define LED_PIN 18
@@ -25,11 +38,26 @@ MqttClientHandler mqttClientHandler(MQTT_SERVER_IP, MQTT_SERVER_PORT, MQTT_TOPIC
 
 /************* DECLARACIÓN DE MÉTODOS ****************/
 void handleMqttMessage(const char* message);
+void waterLevelSensorChanged();
+void handleWaterPumpTimeout();
 
 
 /************* IMPLEMENTACIÓN DE MÉTODOS ****************/
 void handleMqttMessage(const char* message) {
   udpLogger.log(message);
+}
+
+void waterLevelSensorChanged(bool state) {
+  if (state == HIGH) {
+      LOG_I("Nivel de agua correcto");
+  } else {
+      LOG_W("Nivel de agua crítico");
+  }
+  waterPump.setState(state);
+}
+
+void handleWaterPumpTimeout() {
+  LOG_W("Apagado de bomba de agua por tiempo máximo alcanzado");
 }
 
 void otaConfiguration() {
@@ -52,6 +80,14 @@ void otaConfiguration() {
 void setup() {
   // Botones y LED
   // statusLED.setLEDColor(statusLED.getLEDOnColor());
+  statusLED.setLEDOff();
+
+  // WaterPump
+  waterPump.setCallback(handleWaterPumpTimeout);  
+
+  // WaterLevelSensor
+  waterLevelSensor.setCallback(waterLevelSensorChanged);
+  waterLevelSensor.begin();
 
   // WiFi
   WiFi.mode(WIFI_MODE_STA);
@@ -94,6 +130,8 @@ void loop() {
 
   if (currentMillis - previousMQTTMillis >= secondsToSendMQTT) {
     previousMQTTMillis = currentMillis;
-    LOG_I("MQTT Test");
+    //TODO
   }
+
+  waterPump.update();
 }
