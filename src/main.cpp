@@ -9,11 +9,23 @@
 #include "StatusLED.hpp"
 #include "WaterLevelSensor.h"
 #include "WaterPump.h"
+#include "WaterValve.h"
+#include <ESPAsyncWebServer.h>
+#include <SPIFFS.h>
+
+/************** Web **************/
+AsyncWebServer server(80);
 
 /************** WaterPump **************/
 #define WATER_PUMP_PIN 42
 #define WATER_PUMP_MAX_RUNTIME 3000 // 3 seconds
 WaterPump waterPump(WATER_PUMP_PIN, WATER_PUMP_MAX_RUNTIME);
+bool bombaEncendida = false;
+
+/************** WaterValve **************/
+#define WATER_VALVE_PIN 41
+#define WATER_VALVE_MAX_RUNTIME 3000 // 3 seconds
+WaterValve waterValve(WATER_VALVE_PIN, WATER_VALVE_MAX_RUNTIME);
 
 
 /************** WaterLevelSensor **************/
@@ -54,6 +66,8 @@ void waterLevelSensorChanged(bool state) {
       LOG_W("Nivel de agua crítico");
   }
   waterPump.setState(state);
+  waterValve.setState(state);
+  bombaEncendida = state;
 }
 
 void handleWaterPumpTimeout() {
@@ -78,6 +92,12 @@ void otaConfiguration() {
 }
 
 void setup() {
+
+  if (!SPIFFS.begin(true)) {
+    Serial.println("Error al montar el sistema de archivos SPIFFS.");
+    return;
+  }
+
   // Botones y LED
   // statusLED.setLEDColor(statusLED.getLEDOnColor());
   statusLED.setLEDOff();
@@ -116,6 +136,44 @@ void setup() {
   udpLogger.init();
   mqttClientHandler.setup();
   mqttClientHandler.onMessageReceived = handleMqttMessage;
+
+
+  // Servir el archivo index.html cuando accedas a la raíz
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
+    request->send(SPIFFS, "/index.html", "text/html");
+  });
+
+  // Servir archivos estáticos (HTML, CSS, JS) desde SPIFFS
+  // server.serveStatic("/", SPIFFS, "/index.html");
+  server.serveStatic("/style.css", SPIFFS, "/style.css");
+  server.serveStatic("/script.js", SPIFFS, "/script.js");  
+
+
+  // Ruta para encender la bomba
+  server.on("/bomba/encender", HTTP_GET, [](AsyncWebServerRequest *request){
+    LOG_I("Bomba encendida");
+    bombaEncendida = true;
+    request->send(200, "text/plain", "Bomba encendida");
+  });
+
+  // Ruta para apagar la bomba
+  server.on("/bomba/apagar", HTTP_GET, [](AsyncWebServerRequest *request){
+    LOG_I("Bomba apagada");
+    bombaEncendida = false;
+    request->send(200, "text/plain", "Bomba apagada");
+  });
+
+  // Ruta para obtener el estado de la bomba
+  server.on("/bomba/estado", HTTP_GET, [](AsyncWebServerRequest *request){
+    if (bombaEncendida) {
+      request->send(200, "text/plain", "encendida");
+    } else {
+      request->send(200, "text/plain", "apagada");
+    }
+  });
+
+  // Iniciar el servidor
+  server.begin();  
 }
 
 void loop() {
@@ -134,4 +192,5 @@ void loop() {
   }
 
   waterPump.update();
+  waterValve.update();
 }
